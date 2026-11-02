@@ -6,6 +6,13 @@
  *   Bloco | Unidade | Nome | Telefone | E-mail | Atualizado em
  * sempre em ordem de bloco e apartamento (101, 102, ... 201, 202 ...).
  *
+ * Quem vê o quê:
+ *   - Morador: a lista pública mostra só se o apartamento está cadastrado. Para ver ou corrigir o próprio
+ *     apartamento, confirma o telefone de um morador já cadastrado nele.
+ *   - Síndica: entra com a senha e vê/corrige todos os apartamentos e baixa a lista (PDF, Excel, CSV).
+ *     A senha NÃO fica neste arquivo: em Configurações do projeto > Propriedades do script, a propriedade
+ *     SENHA_SINDICA_SHA256 guarda o SHA-256 (hex, minúsculo) da senha.
+ *
  * Publicar: Implantar > Nova implantação > App da Web
  *   - Executar como: Eu
  *   - Quem pode acessar: Qualquer pessoa
@@ -23,11 +30,11 @@ var CABECALHO = ['Bloco', 'Unidade', 'Nome', 'Telefone', 'E-mail', 'Atualizado e
 var MAX_MORADORES = 15;
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.api === 'status') return _json({ ok: true, contagem: _contagem() });
+  if (e && e.parameter && e.parameter.api === 'status') return _json({ ok: true, cadastrados: _cadastrados() });
   return ContentService.createTextOutput('Cadastro de moradores · Condomínio San Marco');
 }
 
-/** Recebe { acao: "abrir" | "salvar", bloco, unidade, telefone, moradores } da página. */
+/** Recebe { acao: "abrir" | "salvar" | "sindica", bloco, unidade, telefone, senha, moradores } da página. */
 function doPost(e) {
   var d;
   try {
@@ -37,6 +44,7 @@ function doPost(e) {
   }
   if (d.acao === 'abrir') return _json(_abrir(d));
   if (d.acao === 'salvar') return _json(_salvar(d));
+  if (d.acao === 'sindica') return _json(_sindica(d));
   return _json({ ok: false, erro: 'Ação desconhecida.' });
 }
 
@@ -73,18 +81,34 @@ function _existe(bloco, unidade) {
   return andar >= 1 && andar <= b.andares && coluna >= 1 && coluna <= b.colunas;
 }
 
-/** { "1-101": 2, ... }: quantos moradores cada apartamento tem. Não devolve nomes nem telefones. */
-function _contagem() {
+/** { "1-101": true, ... }: só diz quais apartamentos já têm cadastro, sem nomes nem quantidades. */
+function _cadastrados() {
   var c = {};
-  _linhas().forEach(function (l) {
-    var k = l[0] + '-' + l[1];
-    c[k] = (c[k] || 0) + 1;
-  });
+  _linhas().forEach(function (l) { c[l[0] + '-' + l[1]] = true; });
   return c;
+}
+
+function _totalApartamentos() {
+  return BLOCOS.reduce(function (s, b) { return s + b.andares * b.colunas; }, 0);
 }
 
 function _digitos(t) {
   return String(t || '').replace(/\D/g, '');
+}
+
+function _sha256(texto) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(texto), Utilities.Charset.UTF_8)
+    .map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); })
+    .join('');
+}
+
+/** A senha da síndica confere? Errar atrasa a resposta, para dificultar quem tenta adivinhar. */
+function _ehSindica(senha) {
+  if (!senha) return false;
+  var hash = PropertiesService.getScriptProperties().getProperty('SENHA_SINDICA_SHA256');
+  if (hash && _sha256(String(senha).trim()) === hash.trim().toLowerCase()) return true;
+  Utilities.sleep(1500);
+  return false;
 }
 
 /** O telefone informado bate (últimos 8 dígitos) com o de algum morador já cadastrado no apartamento? */
@@ -110,13 +134,19 @@ function _fone(texto) {
   return _limpar(texto, 20);
 }
 
+/** Síndica: com a senha certa, devolve a lista completa (para a tabela e para baixar em PDF, Excel ou CSV). */
+function _sindica(d) {
+  if (!_ehSindica(d.senha)) return { ok: false, erro: 'Senha incorreta.' };
+  return { ok: true, cabecalho: CABECALHO, linhas: _linhas(), totalApartamentos: _totalApartamentos() };
+}
+
 function _abrir(d) {
   var bloco = String(d.bloco || '');
   var unidade = String(d.unidade || '');
   if (!_existe(bloco, unidade)) return { ok: false, erro: 'Apartamento não encontrado.' };
   var doApto = _linhas().filter(function (l) { return l[0] === bloco && l[1] === unidade; });
   if (!doApto.length) return { ok: true, moradores: [] };
-  if (!_confere(doApto, d.telefone)) {
+  if (!_confere(doApto, d.telefone) && !_ehSindica(d.senha)) {
     return { ok: false, erro: 'Esse telefone não confere com nenhum morador cadastrado neste apartamento.' };
   }
   return {
@@ -142,12 +172,13 @@ function _salvar(d) {
     if (m.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.email)) return { ok: false, erro: 'O e-mail de ' + m.nome + ' parece errado.' };
   }
 
+  var sindica = d.senha ? _ehSindica(d.senha) : false;
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     var todas = _linhas();
     var doApto = todas.filter(function (l) { return l[0] === bloco && l[1] === unidade; });
-    if (doApto.length && !_confere(doApto, d.telefone)) {
+    if (doApto.length && !sindica && !_confere(doApto, d.telefone)) {
       return { ok: false, erro: 'Para alterar este apartamento, confirme o telefone de um morador já cadastrado.' };
     }
     var agora = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm');
@@ -161,7 +192,7 @@ function _salvar(d) {
     var n = aba.getLastRow();
     if (n > 1) aba.getRange(2, 1, n - 1, CABECALHO.length).clearContent();
     aba.getRange(2, 1, final.length, CABECALHO.length).setNumberFormat('@').setValues(final);
-    return { ok: true, contagem: _contagem() };
+    return { ok: true, cadastrados: _cadastrados() };
   } finally {
     lock.releaseLock();
   }

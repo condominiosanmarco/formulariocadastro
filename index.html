@@ -51,7 +51,7 @@
   .apto .num { display:block; font-size:18px; font-weight:700; }
   .apto .st { display:block; margin-top:2px; font-size:12px; color:var(--muted); }
   .apto.feito { border-color:var(--ok); background:var(--ok-soft); }
-  .apto.feito .st { color:var(--ok); font-weight:600; }
+  .apto.feito .st { color:var(--ok); font-size:11px; font-weight:600; }
   .apto:hover, .apto:focus-visible { border-color:var(--brand); outline:none; }
   .vazio { padding:18px 4px; font-size:14px; color:var(--muted); }
   .nao-achou { margin:10px 2px 0; font-size:13px; color:var(--muted); }
@@ -89,6 +89,37 @@
   .secundario { padding:13px 16px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; }
   .sucesso { text-align:center; padding:8px 0 4px; }
   .sucesso .check { width:56px; height:56px; margin:0 auto 12px; border-radius:50%; background:var(--ok-soft); color:var(--ok); font-size:28px; display:flex; align-items:center; justify-content:center; }
+
+  /* Área da síndica */
+  .admin p { margin:0 0 12px; font-size:14px; line-height:1.5; color:var(--muted); }
+  .admin-entrar { display:flex; gap:8px; }
+  .admin-entrar input { flex:1; min-width:0; padding:12px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fbfaf8; }
+  .admin-entrar .primario { flex:none; padding:12px 18px; }
+  .resumo-adm { padding:12px; border-radius:10px; background:var(--brand-soft); font-size:15px !important; color:var(--ink) !important; }
+  .adm-botoes { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:10px; }
+  .adm-botoes button { padding:12px; border-radius:10px; border:1px solid var(--brand); background:var(--card); color:var(--brand); font-size:15px; font-weight:600; }
+  .tabela-adm { max-height:55vh; overflow:auto; border:1px solid var(--line); border-radius:10px; margin:6px 0 12px; }
+  .tabela-adm table { width:100%; border-collapse:collapse; font-size:13px; }
+  .tabela-adm th, .tabela-adm td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  .tabela-adm th { position:sticky; top:0; background:var(--brand-soft); }
+  .tabela-adm tr.novo-apto td { border-top:2px solid var(--line); }
+  .sair { width:100%; }
+
+  /* Versão para imprimir / salvar em PDF */
+  #impressao { display:none; }
+  @media print {
+    @page { size:A4 landscape; margin:12mm; }
+    body { background:#fff; }
+    body > *:not(#impressao) { display:none !important; }
+    #impressao { display:block; font-size:11px; color:#000; }
+    #impressao h1 { font-size:16px; margin:0 0 2px; }
+    #impressao .info { margin:0 0 10px; color:#444; }
+    #impressao table { width:100%; border-collapse:collapse; }
+    #impressao th, #impressao td { border:1px solid #bbb; padding:4px 6px; text-align:left; }
+    #impressao th { background:#e7efec; }
+    #impressao tr { break-inside:avoid; }
+    #impressao thead { display:table-header-group; }
+  }
 </style>
 </head>
 <body>
@@ -108,7 +139,7 @@
     <ol class="passos">
       <li><strong>Encontre seu apartamento.</strong> Digite o número na busca (ex.: 203) ou role a lista e escolha o bloco.</li>
       <li><strong>Toque no apartamento.</strong> Informe quantas pessoas moram nele e preencha, para cada uma, o nome completo, o telefone/WhatsApp e o e-mail (o e-mail é opcional).</li>
-      <li><strong>Toque em “Salvar cadastro”.</strong> Pronto: o apartamento fica verde, com ✓ e o número de moradores.</li>
+      <li><strong>Toque em “Salvar cadastro”.</strong> Pronto: o apartamento fica verde clarinho, escrito “Cadastrado”.</li>
     </ol>
     <p class="dica"><strong>Precisa corrigir?</strong> Para trocar um nome, mudar um telefone, incluir ou tirar um morador, toque de novo no seu apartamento e confirme o telefone de um dos moradores já cadastrados. Por segurança, os dados de um apartamento não aparecem para os outros moradores.</p>
   </section>
@@ -130,8 +161,34 @@
     <p class="nao-achou">Não encontrou seu apartamento ou esqueceu o telefone cadastrado? Fale com a síndica.</p>
   </section>
 
+  <section class="bloco-card admin" id="area-sindica">
+    <h2>Área da síndica</h2>
+    <div id="adm-login">
+      <p>Somente a síndica tem acesso aos dados de todos os apartamentos. Digite a senha para ver a lista completa, corrigir qualquer apartamento e baixar a lista em PDF, Excel ou CSV.</p>
+      <div class="admin-entrar">
+        <input id="adm-senha" type="password" autocomplete="current-password" placeholder="Senha da síndica" aria-label="Senha da síndica">
+        <button type="button" class="primario" id="adm-entrar">Entrar</button>
+      </div>
+    </div>
+    <div class="aviso" id="adm-aviso"></div>
+    <div id="adm-painel" hidden>
+      <p class="resumo-adm" id="adm-resumo"></p>
+      <p>Para corrigir um apartamento, toque nele na lista acima: como síndica, você não precisa confirmar telefone.</p>
+      <div class="adm-botoes">
+        <button type="button" id="adm-pdf">📄 PDF</button>
+        <button type="button" id="adm-xlsx">📊 Excel</button>
+        <button type="button" id="adm-csv">🧾 CSV</button>
+      </div>
+      <p><strong>PDF:</strong> abre a janela de impressão; escolha “Salvar como PDF”. <strong>Excel e CSV:</strong> o arquivo é baixado direto. Depois é só enviar o arquivo por WhatsApp ou e-mail.</p>
+      <div class="tabela-adm" id="adm-tabela"></div>
+      <button type="button" class="secundario sair" id="adm-sair">Sair da área da síndica</button>
+    </div>
+  </section>
+
   <footer>Condomínio San Marco · Cadastro de moradores</footer>
 </div>
+
+<div id="impressao"></div>
 
 <dialog id="janela" aria-labelledby="j-titulo">
   <div class="j-topo">
@@ -200,7 +257,7 @@
   var elEstado = document.getElementById("estado");
   var janela = document.getElementById("janela");
 
-  var contagem = {};      // { "1-101": 2 }
+  var cadastrados = {};   // { "1-101": true }: só diz quem já se cadastrou
   var filtroBloco = "";
   var atual = null;       // { bloco, unidade, nomeBloco }
   var telefoneVerif = ""; // telefone confirmado para alterar o apartamento aberto
@@ -242,9 +299,9 @@
         if (!doAndar.length) continue;
         html += '<div class="andar">' + b.nome + " · " + a + "º andar</div><div class=\"grade\">";
         doAndar.forEach(function (x) {
-          var n = contagem[x.bloco + "-" + x.unidade] || 0;
-          var st = n ? "✓ " + n + (n === 1 ? " morador" : " moradores") : "Cadastrar";
-          html += '<button type="button" class="apto' + (n ? " feito" : "") + '" data-bloco="' + x.bloco + '" data-unidade="' + x.unidade + '">' +
+          var feito = !!cadastrados[x.bloco + "-" + x.unidade];
+          var st = feito ? "✓ Cadastrado" : "Cadastrar";
+          html += '<button type="button" class="apto' + (feito ? " feito" : "") + '" data-bloco="' + x.bloco + '" data-unidade="' + x.unidade + '">' +
                   '<span class="num">' + x.unidade + '</span><span class="st">' + st + "</span></button>";
         });
         html += "</div>";
@@ -252,14 +309,14 @@
     });
     elLista.innerHTML = html || '<div class="vazio">Nenhum apartamento com esse número. Confira o número ou escolha “Todos”.</div>';
 
-    var feitos = APTOS.filter(function (x) { return contagem[x.bloco + "-" + x.unidade]; }).length;
+    var feitos = APTOS.filter(function (x) { return cadastrados[x.bloco + "-" + x.unidade]; }).length;
     elContador.textContent = feitos + " de " + APTOS.length + " apartamentos cadastrados";
     elBarra.style.width = (feitos / APTOS.length * 100) + "%";
   }
 
   function carregarStatus() {
     return fetch(API + "?api=status").then(function (r) { return r.json(); }).then(function (r) {
-      if (r.ok) { contagem = r.contagem || {}; elEstado.textContent = ""; }
+      if (r.ok) { cadastrados = r.cadastrados || {}; elEstado.textContent = ""; }
       renderLista();
     }).catch(function () {
       elEstado.textContent = "Não foi possível carregar os cadastros agora. Recarregue a página.";
@@ -290,10 +347,11 @@
     atual = { bloco: bloco, unidade: unidade, nomeBloco: b.nome };
     telefoneVerif = "";
     document.getElementById("j-titulo").textContent = b.nome + " · Apartamento " + unidade;
-    var n = contagem[bloco + "-" + unidade] || 0;
-    if (n) {
+    if (cadastrados[bloco + "-" + unidade] && senhaSindica) {
+      abrirComoSindica();
+    } else if (cadastrados[bloco + "-" + unidade]) {
       document.getElementById("j-verificar-texto").textContent =
-        "Este apartamento já tem cadastro (" + n + (n === 1 ? " morador" : " moradores") + "). Para ver ou corrigir, digite o telefone de um dos moradores cadastrados.";
+        "Este apartamento já foi cadastrado. Para ver ou corrigir, digite o telefone de um dos moradores cadastrados.";
       document.getElementById("j-tel-verif").value = "";
       document.getElementById("j-verificar-aviso").textContent = "";
       mostrar("j-verificar");
@@ -405,9 +463,9 @@
     if (erro) { aviso.textContent = erro; return; }
     aviso.textContent = "";
     botao.disabled = true; botao.textContent = "Salvando…";
-    chamar({ acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, telefone: telefoneVerif, moradores: moradores }).then(function (r) {
+    chamar({ acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, telefone: telefoneVerif, senha: senhaSindica, moradores: moradores }).then(function (r) {
       if (!r.ok) { aviso.textContent = r.erro; return; }
-      contagem = r.contagem || contagem;
+      cadastrados = r.cadastrados || cadastrados;
       telefoneVerif = moradores[0].telefone;
       renderLista();
       var n = moradores.length;
@@ -423,6 +481,138 @@
   document.getElementById("j-fechar").addEventListener("click", function () { janela.close(); });
   janela.addEventListener("click", function (e) {
     if (e.target.hasAttribute("data-fechar") || e.target === janela) janela.close();
+  });
+
+  // ---------- Área da síndica: vê tudo, corrige qualquer apartamento e exporta ----------
+  var exportado = null; // { cabecalho, linhas, totalApartamentos }
+
+  function mostrarSindica(r) {
+    exportado = r;
+    var aptos = {};
+    r.linhas.forEach(function (l) { aptos[l[0] + "-" + l[1]] = 1; });
+    var nAptos = Object.keys(aptos).length;
+    document.getElementById("adm-resumo").innerHTML = "<strong>" + r.linhas.length + "</strong> moradores em <strong>" + nAptos +
+      "</strong> de " + r.totalApartamentos + " apartamentos. Faltam " + (r.totalApartamentos - nAptos) + " apartamentos.";
+    var html = "<table><thead><tr>" + r.cabecalho.map(function (c) { return "<th>" + escapar(c) + "</th>"; }).join("") + "</tr></thead><tbody>";
+    var anterior = "";
+    r.linhas.forEach(function (l) {
+      var chave = l[0] + "-" + l[1];
+      html += '<tr class="' + (anterior && chave !== anterior ? "novo-apto" : "") + '">' + l.map(function (v) { return "<td>" + escapar(v) + "</td>"; }).join("") + "</tr>";
+      anterior = chave;
+    });
+    document.getElementById("adm-tabela").innerHTML = r.linhas.length ? html + "</tbody></table>" : '<div class="vazio" style="padding:12px">Nenhum cadastro ainda.</div>';
+    document.getElementById("adm-login").hidden = true;
+    document.getElementById("adm-painel").hidden = false;
+  }
+
+  function carregarSindica() {
+    return chamar({ acao: "sindica", senha: senhaSindica }).then(function (r) { if (r.ok) mostrarSindica(r); });
+  }
+
+  document.getElementById("adm-entrar").addEventListener("click", function () {
+    var botao = this;
+    var aviso = document.getElementById("adm-aviso");
+    var senha = document.getElementById("adm-senha").value.trim();
+    if (!senha) { aviso.textContent = "Digite a senha."; return; }
+    aviso.textContent = "";
+    botao.disabled = true; botao.textContent = "Entrando…";
+    chamar({ acao: "sindica", senha: senha }).then(function (r) {
+      if (!r.ok) { aviso.textContent = r.erro; return; }
+      senhaSindica = senha;
+      document.getElementById("adm-senha").value = "";
+      mostrarSindica(r);
+    }).catch(function () {
+      aviso.textContent = "Não foi possível entrar agora. Verifique a internet e tente de novo.";
+    }).then(function () { botao.disabled = false; botao.textContent = "Entrar"; });
+  });
+
+  document.getElementById("adm-sair").addEventListener("click", function () {
+    senhaSindica = ""; exportado = null;
+    document.getElementById("adm-tabela").innerHTML = "";
+    document.getElementById("adm-painel").hidden = true;
+    document.getElementById("adm-login").hidden = false;
+  });
+
+  // Síndica abre um apartamento já cadastrado direto, sem confirmar telefone
+  function abrirComoSindica() {
+    document.getElementById("j-verificar-texto").textContent = "Carregando os moradores…";
+    document.getElementById("j-tel-verif").value = "";
+    document.getElementById("j-verificar-aviso").textContent = "";
+    mostrar("j-verificar");
+    chamar({ acao: "abrir", bloco: atual.bloco, unidade: atual.unidade, senha: senhaSindica }).then(function (r) {
+      if (!r.ok) { document.getElementById("j-verificar-aviso").textContent = r.erro; return; }
+      moradores = r.moradores.length ? r.moradores : [{ nome: "", telefone: "", email: "" }];
+      renderMoradores();
+      document.getElementById("j-form-aviso").textContent = "";
+      mostrar("j-form");
+    }).catch(function () {
+      document.getElementById("j-verificar-aviso").textContent = "Não foi possível abrir agora. Tente de novo.";
+    });
+  }
+
+  function dataHoje(comHora) {
+    var d = new Date();
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    var s = p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear();
+    return comHora ? s + " " + p(d.getHours()) + ":" + p(d.getMinutes()) : s;
+  }
+  function nomeArquivo(ext) { return "cadastro-moradores-san-marco-" + dataHoje().replace(/\//g, "-") + "." + ext; }
+
+  function baixar(blob, nome) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  // CSV com ";" e BOM: abre certo no Excel em português, com acentos
+  function gerarCsv() {
+    var celula = function (v) { v = String(v == null ? "" : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    return "\ufeff" + [exportado.cabecalho].concat(exportado.linhas).map(function (l) { return l.map(celula).join(";"); }).join("\r\n");
+  }
+  document.getElementById("adm-csv").addEventListener("click", function () {
+    if (exportado) baixar(new Blob([gerarCsv()], { type: "text/csv;charset=utf-8" }), nomeArquivo("csv"));
+  });
+
+  // Excel: a biblioteca só é carregada quando alguém pede o arquivo
+  function carregarXlsx() {
+    if (window.XLSX) return Promise.resolve();
+    return new Promise(function (ok, falha) {
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload = ok; s.onerror = falha;
+      document.head.appendChild(s);
+    });
+  }
+  document.getElementById("adm-xlsx").addEventListener("click", function () {
+    if (!exportado) return;
+    carregarXlsx().then(function () {
+      var planilha = XLSX.utils.aoa_to_sheet([exportado.cabecalho].concat(exportado.linhas));
+      planilha["!cols"] = [{ wch: 6 }, { wch: 8 }, { wch: 34 }, { wch: 17 }, { wch: 32 }, { wch: 17 }];
+      var livro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(livro, planilha, "Cadastro");
+      XLSX.writeFile(livro, nomeArquivo("xlsx"));
+    }).catch(function () {
+      document.getElementById("adm-aviso").textContent = "Não foi possível gerar o Excel agora. Use o CSV, que abre no Excel do mesmo jeito.";
+    });
+  });
+
+  function montarImpressao() {
+    var colunas = exportado.cabecalho.slice(0, 5); // Bloco, Unidade, Nome, Telefone, E-mail
+    var html = "<h1>Condomínio San Marco · Cadastro de moradores</h1>" +
+      '<p class="info">Gerado em ' + dataHoje(true) + " · " + exportado.linhas.length + " moradores</p>" +
+      "<table><thead><tr>" + colunas.map(function (c) { return "<th>" + escapar(c) + "</th>"; }).join("") + "</tr></thead><tbody>";
+    exportado.linhas.forEach(function (l) {
+      html += "<tr>" + l.slice(0, 5).map(function (v) { return "<td>" + escapar(v) + "</td>"; }).join("") + "</tr>";
+    });
+    document.getElementById("impressao").innerHTML = html + "</tbody></table>";
+  }
+  document.getElementById("adm-pdf").addEventListener("click", function () {
+    if (!exportado) return;
+    montarImpressao();
+    window.print();
   });
 
   renderLista();
