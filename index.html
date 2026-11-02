@@ -88,6 +88,12 @@
   .primario:disabled { opacity:.6; }
   .secundario { padding:13px 16px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; }
   .sucesso { text-align:center; padding:8px 0 4px; }
+  .confirmacao { font-size:13px !important; color:var(--ok); font-weight:600; }
+  .aviso-envio { position:fixed; left:12px; right:12px; bottom:12px; z-index:5; max-width:560px; margin:0 auto; display:flex; gap:10px; align-items:center;
+                 padding:12px 14px; border-radius:12px; background:#fff7e6; border:1px solid #e8c77a; color:#5c4300; font-size:14px; line-height:1.4;
+                 box-shadow:0 6px 20px rgba(0,0,0,.12); }
+  .aviso-envio span { flex:1; }
+  .aviso-envio button { flex:none; padding:9px 12px; border-radius:9px; border:none; background:#8a5a00; color:#fff; font-size:14px; font-weight:600; }
   .sucesso .check { width:56px; height:56px; margin:0 auto 12px; border-radius:50%; background:var(--ok-soft); color:var(--ok); font-size:28px; display:flex; align-items:center; justify-content:center; }
 
   /* Área da síndica */
@@ -188,6 +194,11 @@
   <footer>Condomínio San Marco · Cadastro de moradores</footer>
 </div>
 
+<div class="aviso-envio" id="aviso-envio" role="status" hidden>
+  <span></span>
+  <button type="button">Tentar agora</button>
+</div>
+
 <div id="impressao"></div>
 
 <dialog id="janela" aria-labelledby="j-titulo">
@@ -233,6 +244,7 @@
   <div class="j-corpo sucesso" id="j-ok" hidden>
     <div class="check">✓</div>
     <p id="j-ok-texto"></p>
+    <p class="confirmacao" id="j-ok-confirmacao"></p>
     <p style="color:var(--muted);font-size:14px">Para corrigir depois, é só tocar no apartamento de novo.</p>
     <div class="acoes"><button type="button" class="primario" data-fechar>Fechar</button></div>
   </div>
@@ -240,6 +252,7 @@
 
 <script>
 (function () {
+  "use strict";
   // Link do Apps Script implantado (a planilha do cadastro)
   var API = "https://script.google.com/macros/s/AKfycbzFBuzV7JFPSdtlHqR_68zfef1OIepJWT0Lnciwq1BOGikEtHkXNVWw6D3GHScdmZTM/exec";
 
@@ -258,6 +271,7 @@
   var janela = document.getElementById("janela");
 
   var cadastrados = {};   // { "1-101": true }: só diz quem já se cadastrou
+  var senhaSindica = "";  // preenchida quando a síndica entra (fica só na memória da página)
   var filtroBloco = "";
   var atual = null;       // { bloco, unidade, nomeBloco }
   var telefoneVerif = ""; // telefone confirmado para alterar o apartamento aberto
@@ -316,7 +330,12 @@
 
   function carregarStatus() {
     return fetch(API + "?api=status").then(function (r) { return r.json(); }).then(function (r) {
-      if (r.ok) { cadastrados = r.cadastrados || {}; elEstado.textContent = ""; }
+      if (r.ok) {
+        // Só acrescenta: uma resposta antiga nunca apaga o verde de um cadastro feito agora há pouco
+        Object.keys(r.cadastrados || {}).forEach(function (k) { cadastrados[k] = true; });
+        Object.keys(pendentes).forEach(function (k) { cadastrados[k] = true; }); // guardados no celular, ainda a enviar
+        elEstado.textContent = "";
+      }
       renderLista();
     }).catch(function () {
       elEstado.textContent = "Não foi possível carregar os cadastros agora. Recarregue a página.";
@@ -456,25 +475,95 @@
     return erro;
   }
 
+  // ---------- Envio do cadastro: verde na hora, envio por trás com novas tentativas ----------
+  // Cadastros ainda não confirmados pelo servidor ficam guardados neste celular e são reenviados ao abrir a página.
+  var CHAVE_PENDENTES = "sanmarco_pendentes";
+  var pendentes = lerPendentes();       // { "1-301": pedido }
+  var elAvisoEnvio = document.getElementById("aviso-envio");
+
+  function lerPendentes() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_PENDENTES) || "{}"); } catch (e) { return {}; }
+  }
+  function gravarPendentes() {
+    try { localStorage.setItem(CHAVE_PENDENTES, JSON.stringify(pendentes)); } catch (e) {}
+  }
+
+  // Um envio com limite de tempo: a página nunca fica presa esperando
+  function enviarUmaVez(pedido) {
+    var ctl = window.AbortController ? new AbortController() : null;
+    var t = ctl ? setTimeout(function () { ctl.abort(); }, 25000) : null;
+    return fetch(API, { method: "POST", body: JSON.stringify(pedido), keepalive: true, signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { clearTimeout(t); return r; }, function (e) { clearTimeout(t); throw e; });
+  }
+  function enviarComTentativas(pedido, tentativa) {
+    tentativa = tentativa || 1;
+    return enviarUmaVez(pedido).catch(function (e) {
+      if (tentativa >= 3) throw e;
+      return new Promise(function (ok) { setTimeout(ok, tentativa * 2500); }).then(function () { return enviarComTentativas(pedido, tentativa + 1); });
+    });
+  }
+
+  function mostrarAvisoEnvio(texto, comBotao) {
+    elAvisoEnvio.querySelector("span").textContent = texto;
+    elAvisoEnvio.querySelector("button").hidden = !comBotao;
+    elAvisoEnvio.hidden = !texto;
+  }
+
+  function enviarCadastro(chave, pedido, aoConfirmar) {
+    return enviarComTentativas(pedido).then(function (r) {
+      if (!r.ok) {
+        delete pendentes[chave]; gravarPendentes();
+        mostrarAvisoEnvio("O cadastro do apartamento " + pedido.unidade + " (Bloco " + pedido.bloco + ") não foi aceito: " + r.erro, false);
+        carregarStatus();
+        return;
+      }
+      delete pendentes[chave]; gravarPendentes();
+      Object.keys(r.cadastrados || {}).forEach(function (k) { cadastrados[k] = true; });
+      renderLista();
+      if (senhaSindica) carregarSindica();
+      if (!Object.keys(pendentes).length) mostrarAvisoEnvio("", false);
+      if (aoConfirmar) aoConfirmar(true);
+    }).catch(function () {
+      mostrarAvisoEnvio("A internet está instável: o cadastro do apartamento " + pedido.unidade +
+        " (Bloco " + pedido.bloco + ") está guardado neste celular e será enviado assim que a conexão voltar.", true);
+      if (aoConfirmar) aoConfirmar(false);
+    });
+  }
+
+  function reenviarPendentes() {
+    Object.keys(pendentes).forEach(function (k) { enviarCadastro(k, pendentes[k]); });
+  }
+  elAvisoEnvio.querySelector("button").addEventListener("click", function () {
+    mostrarAvisoEnvio("Enviando de novo…", false);
+    reenviarPendentes();
+  });
+  window.addEventListener("online", reenviarPendentes);
+
   document.getElementById("j-salvar").addEventListener("click", function () {
-    var botao = this;
     var aviso = document.getElementById("j-form-aviso");
     var erro = validar();
     if (erro) { aviso.textContent = erro; return; }
     aviso.textContent = "";
-    botao.disabled = true; botao.textContent = "Salvando…";
-    chamar({ acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, telefone: telefoneVerif, senha: senhaSindica, moradores: moradores }).then(function (r) {
-      if (!r.ok) { aviso.textContent = r.erro; return; }
-      cadastrados = r.cadastrados || cadastrados;
-      telefoneVerif = moradores[0].telefone;
-      renderLista();
-      var n = moradores.length;
-      document.getElementById("j-ok-texto").innerHTML = "<strong>Cadastro salvo!</strong><br>" + atual.nomeBloco + " · Apartamento " + atual.unidade +
-        " · " + n + (n === 1 ? " morador" : " moradores") + ".";
-      mostrar("j-ok");
-    }).catch(function () {
-      aviso.textContent = "Não foi possível salvar agora. Verifique a internet e tente de novo.";
-    }).then(function () { botao.disabled = false; botao.textContent = "Salvar cadastro"; });
+
+    var chave = atual.bloco + "-" + atual.unidade;
+    var pedido = { acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, telefone: telefoneVerif, senha: senhaSindica, moradores: moradores.slice() };
+    if (!senhaSindica) { pendentes[chave] = pedido; gravarPendentes(); } // a senha da síndica nunca fica guardada no celular
+
+    // Verde na hora
+    cadastrados[chave] = true;
+    telefoneVerif = moradores[0].telefone;
+    renderLista();
+    var n = moradores.length;
+    document.getElementById("j-ok-texto").innerHTML = "<strong>Cadastro salvo!</strong><br>" + atual.nomeBloco + " · Apartamento " + atual.unidade +
+      " · " + n + (n === 1 ? " morador" : " moradores") + ".";
+    var elConf = document.getElementById("j-ok-confirmacao");
+    elConf.textContent = "Enviando para o condomínio…";
+    mostrar("j-ok");
+
+    enviarCadastro(chave, pedido, function (ok) {
+      elConf.textContent = ok ? "✓ Recebido pelo condomínio." : "Sem internet agora: o cadastro ficou guardado e será enviado automaticamente.";
+    });
   });
 
   // Fechar a janela: botão ✕, botões "Cancelar"/"Fechar" e toque fora dela
@@ -616,7 +705,12 @@
   });
 
   renderLista();
-  carregarStatus();
+  carregarStatus().then(function () {
+    if (Object.keys(pendentes).length) {
+      mostrarAvisoEnvio("Enviando cadastro guardado neste celular…", false);
+      reenviarPendentes();
+    }
+  });
 })();
 </script>
 </body>

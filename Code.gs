@@ -188,11 +188,14 @@ function _salvar(d) {
       .concat(novas)
       .sort(function (a, b) { return (Number(a[0]) - Number(b[0])) || (Number(a[1]) - Number(b[1])); });
 
+    // Uma escrita só; limpa apenas as linhas que sobraram quando a lista diminui
     var aba = _aba();
     var n = aba.getLastRow();
-    if (n > 1) aba.getRange(2, 1, n - 1, CABECALHO.length).clearContent();
-    aba.getRange(2, 1, final.length, CABECALHO.length).setNumberFormat('@').setValues(final);
-    return { ok: true, cadastrados: _cadastrados() };
+    aba.getRange(2, 1, final.length, CABECALHO.length).setValues(final);
+    if (n > final.length + 1) aba.getRange(final.length + 2, 1, n - final.length - 1, CABECALHO.length).clearContent();
+    var cadastrados = {};
+    final.forEach(function (l) { cadastrados[l[0] + '-' + l[1]] = true; });
+    return { ok: true, cadastrados: cadastrados };
   } finally {
     lock.releaseLock();
   }
