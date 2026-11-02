@@ -3,23 +3,431 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cadastro · Condomínio San Marco</title>
+<title>Cadastro de moradores · Condomínio San Marco</title>
 <style>
-  :root { --bg:#f5f4f0; --card:#fff; --ink:#1f1f1d; --muted:#6b6a65; --line:#dedbd3; --brand:#1f4e46; }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-         font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); padding:16px; }
-  .card { width:100%; max-width:480px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:28px 22px; text-align:center; }
-  .sobre { font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 6px; }
-  h1 { font-size:22px; margin:0 0 14px; color:var(--brand); }
-  p { font-size:15px; line-height:1.5; margin:0; color:var(--muted); }
+  :root { --bg:#f4f3ef; --card:#fff; --ink:#1e1f1c; --muted:#676961; --line:#dedcd4;
+          --brand:#24564b; --brand-ink:#fff; --brand-soft:#e7efec; --ok:#2f6b3a; --ok-soft:#e5f1e7;
+          --err:#a12d2d; --err-soft:#fbeaea; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  button { font:inherit; cursor:pointer; }
+  [hidden] { display:none !important; }
+
+  /* Topo com a foto do condomínio bem clarinha ao fundo */
+  .topo { position:relative; overflow:hidden; border-radius:16px; background:var(--brand-soft); border:1px solid var(--line); }
+  .topo .foto { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.22; }
+  .topo-texto { position:relative; padding:34px 20px 30px; text-align:center; }
+  .sobre { margin:0 0 6px; font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); font-weight:600; }
+  .topo h1 { margin:0 0 8px; font-size:26px; line-height:1.2; }
+  .topo .sub { margin:0 auto; max-width:440px; font-size:15px; line-height:1.5; color:#3d3f39; }
+
+  .bloco-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-top:14px; }
+  .bloco-card h2 { margin:0 0 12px; font-size:17px; }
+  .passos { margin:0; padding:0; list-style:none; counter-reset:p; display:flex; flex-direction:column; gap:12px; }
+  .passos li { position:relative; padding-left:38px; font-size:15px; line-height:1.5; counter-increment:p; }
+  .passos li::before { content:counter(p); position:absolute; left:0; top:0; width:26px; height:26px; border-radius:50%;
+                       background:var(--brand); color:var(--brand-ink); font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .dica { margin:14px 0 0; padding:10px 12px; border-radius:10px; background:var(--brand-soft); font-size:14px; line-height:1.5; }
+
+  .resumo { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .contador { font-size:14px; color:var(--muted); }
+  .barra { flex:1; min-width:160px; height:8px; border-radius:99px; background:var(--line); overflow:hidden; }
+  .barra > div { height:100%; width:0; background:var(--ok); transition:width .3s; }
+  .busca { width:100%; padding:13px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fbfaf8; }
+  .filtros { display:flex; gap:8px; margin:12px 0 10px; flex-wrap:wrap; }
+  .chip { padding:8px 14px; border-radius:99px; border:1px solid var(--line); background:var(--card); font-size:14px; color:var(--ink); }
+  .chip.ativo { background:var(--brand); border-color:var(--brand); color:var(--brand-ink); }
+  .legenda { display:flex; gap:16px; font-size:13px; color:var(--muted); margin-bottom:8px; }
+  .ponto { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; border:1px solid var(--line); background:#fff; }
+  .ponto.feito { background:var(--ok); border-color:var(--ok); }
+  .estado { font-size:14px; color:var(--err); min-height:0; margin-bottom:6px; }
+
+  /* Lista com barra de rolagem */
+  .lista { max-height:62vh; overflow-y:auto; border:1px solid var(--line); border-radius:12px; padding:4px 12px 12px; background:#fbfaf8; }
+  .andar { margin:14px 0 8px; font-size:13px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:8px; }
+  .apto { text-align:left; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
+  .apto .num { display:block; font-size:18px; font-weight:700; }
+  .apto .st { display:block; margin-top:2px; font-size:12px; color:var(--muted); }
+  .apto.feito { border-color:var(--ok); background:var(--ok-soft); }
+  .apto.feito .st { color:var(--ok); font-weight:600; }
+  .apto:hover, .apto:focus-visible { border-color:var(--brand); outline:none; }
+  .vazio { padding:18px 4px; font-size:14px; color:var(--muted); }
+  .nao-achou { margin:10px 2px 0; font-size:13px; color:var(--muted); }
+  footer { text-align:center; font-size:13px; color:var(--muted); margin:22px 0 8px; }
+
+  /* Janela do apartamento */
+  dialog { width:min(560px, calc(100vw - 24px)); max-height:92vh; padding:0; border:none; border-radius:16px; background:var(--card); color:var(--ink); }
+  dialog::backdrop { background:rgba(20,22,20,.45); }
+  .j-topo { position:sticky; top:0; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:10px;
+            padding:14px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  .j-topo h2 { margin:0; font-size:18px; }
+  .fechar { border:none; background:none; font-size:20px; color:var(--muted); padding:4px 8px; }
+  .j-corpo { padding:16px; }
+  .j-corpo p { margin:0 0 12px; font-size:15px; line-height:1.5; }
+  .campo { display:block; margin-bottom:10px; }
+  .campo span { display:block; font-size:13px; font-weight:600; margin-bottom:4px; }
+  .campo span em { font-weight:400; font-style:normal; color:var(--muted); }
+  .campo input { width:100%; padding:11px 12px; font-size:16px; border:1px solid var(--line); border-radius:9px; background:#fbfaf8; }
+  .campo input:focus { outline:2px solid var(--brand-soft); border-color:var(--brand); }
+  .campo input.invalido { border-color:var(--err); background:var(--err-soft); }
+  .qtd { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border-radius:10px; background:var(--brand-soft); margin-bottom:14px; }
+  .qtd strong { font-size:15px; }
+  .stepper { display:flex; align-items:center; gap:10px; }
+  .stepper button { width:38px; height:38px; border-radius:50%; border:1px solid var(--brand); background:var(--card); color:var(--brand); font-size:20px; line-height:1; }
+  .stepper output { min-width:24px; text-align:center; font-size:20px; font-weight:700; }
+  .morador { border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; }
+  .morador-topo { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .morador-topo strong { font-size:15px; }
+  .remover { border:none; background:none; color:var(--err); font-size:13px; padding:4px 0; }
+  .adicionar { width:100%; padding:11px; border-radius:10px; border:1px dashed var(--brand); background:none; color:var(--brand); font-size:15px; font-weight:600; margin-bottom:14px; }
+  .aviso { min-height:0; font-size:14px; color:var(--err); margin-bottom:10px; }
+  .acoes { display:flex; gap:10px; }
+  .primario { flex:1; padding:13px; border-radius:10px; border:none; background:var(--brand); color:var(--brand-ink); font-size:16px; font-weight:600; }
+  .primario:disabled { opacity:.6; }
+  .secundario { padding:13px 16px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; }
+  .sucesso { text-align:center; padding:8px 0 4px; }
+  .sucesso .check { width:56px; height:56px; margin:0 auto 12px; border-radius:50%; background:var(--ok-soft); color:var(--ok); font-size:28px; display:flex; align-items:center; justify-content:center; }
 </style>
 </head>
 <body>
-  <main class="card">
-    <p class="sobre">Condomínio San Marco</p>
-    <h1>Formulário de cadastro</h1>
-    <p>O formulário está sendo preparado e em breve estará disponível neste endereço.</p>
-  </main>
+<div class="wrap">
+
+  <header class="topo">
+    <img class="foto" src="fachada.jpg" alt="" onerror="this.remove()">
+    <div class="topo-texto">
+      <p class="sobre">Condomínio San Marco</p>
+      <h1>Cadastro de moradores</h1>
+      <p class="sub">Atualize os dados de quem mora no seu apartamento. Leva só alguns minutos.</p>
+    </div>
+  </header>
+
+  <section class="bloco-card">
+    <h2>Como funciona</h2>
+    <ol class="passos">
+      <li><strong>Encontre seu apartamento.</strong> Digite o número na busca (ex.: 203) ou role a lista e escolha o bloco.</li>
+      <li><strong>Toque no apartamento.</strong> Informe quantas pessoas moram nele e preencha, para cada uma, o nome completo, o telefone/WhatsApp e o e-mail (o e-mail é opcional).</li>
+      <li><strong>Toque em “Salvar cadastro”.</strong> Pronto: o apartamento fica verde, com ✓ e o número de moradores.</li>
+    </ol>
+    <p class="dica"><strong>Precisa corrigir?</strong> Para trocar um nome, mudar um telefone, incluir ou tirar um morador, toque de novo no seu apartamento e confirme o telefone de um dos moradores já cadastrados. Por segurança, os dados de um apartamento não aparecem para os outros moradores.</p>
+  </section>
+
+  <section class="bloco-card">
+    <div class="resumo">
+      <span class="contador" id="contador">Carregando os apartamentos…</span>
+      <div class="barra" aria-hidden="true"><div id="barra"></div></div>
+    </div>
+    <input id="busca" class="busca" type="search" inputmode="numeric" placeholder="Digite o número do apartamento (ex.: 203)" aria-label="Buscar apartamento">
+    <div class="filtros" id="filtros">
+      <button type="button" class="chip ativo" data-bloco="">Todos</button>
+      <button type="button" class="chip" data-bloco="1">Bloco 1</button>
+      <button type="button" class="chip" data-bloco="2">Bloco 2</button>
+    </div>
+    <div class="legenda"><span><i class="ponto"></i>Falta cadastrar</span><span><i class="ponto feito"></i>Cadastrado</span></div>
+    <div class="estado" id="estado"></div>
+    <div class="lista" id="lista" tabindex="0" aria-label="Lista de apartamentos"></div>
+    <p class="nao-achou">Não encontrou seu apartamento ou esqueceu o telefone cadastrado? Fale com a síndica.</p>
+  </section>
+
+  <footer>Condomínio San Marco · Cadastro de moradores</footer>
+</div>
+
+<dialog id="janela" aria-labelledby="j-titulo">
+  <div class="j-topo">
+    <h2 id="j-titulo">Apartamento</h2>
+    <button type="button" class="fechar" id="j-fechar" aria-label="Fechar">✕</button>
+  </div>
+
+  <!-- Apartamento já cadastrado: confirma o telefone antes de mostrar os dados -->
+  <div class="j-corpo" id="j-verificar" hidden>
+    <p id="j-verificar-texto"></p>
+    <label class="campo">
+      <span>Telefone de um morador cadastrado</span>
+      <input id="j-tel-verif" type="tel" inputmode="tel" autocomplete="tel" placeholder="(21) 99999-9999">
+    </label>
+    <div class="aviso" id="j-verificar-aviso"></div>
+    <div class="acoes">
+      <button type="button" class="secundario" data-fechar>Cancelar</button>
+      <button type="button" class="primario" id="j-verificar-ok">Continuar</button>
+    </div>
+  </div>
+
+  <!-- Formulário dos moradores -->
+  <div class="j-corpo" id="j-form" hidden>
+    <div class="qtd">
+      <strong>Quantas pessoas moram no apartamento?</strong>
+      <div class="stepper">
+        <button type="button" id="j-menos" aria-label="Diminuir">−</button>
+        <output id="j-qtd">1</output>
+        <button type="button" id="j-mais" aria-label="Aumentar">+</button>
+      </div>
+    </div>
+    <div id="j-moradores"></div>
+    <button type="button" class="adicionar" id="j-adicionar">+ Adicionar outro morador</button>
+    <div class="aviso" id="j-form-aviso"></div>
+    <div class="acoes">
+      <button type="button" class="secundario" data-fechar>Cancelar</button>
+      <button type="button" class="primario" id="j-salvar">Salvar cadastro</button>
+    </div>
+  </div>
+
+  <!-- Confirmação -->
+  <div class="j-corpo sucesso" id="j-ok" hidden>
+    <div class="check">✓</div>
+    <p id="j-ok-texto"></p>
+    <p style="color:var(--muted);font-size:14px">Para corrigir depois, é só tocar no apartamento de novo.</p>
+    <div class="acoes"><button type="button" class="primario" data-fechar>Fechar</button></div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  // Link do Apps Script implantado (a planilha do cadastro)
+  var API = "https://script.google.com/macros/s/AKfycbzFBuzV7JFPSdtlHqR_68zfef1OIepJWT0Lnciwq1BOGikEtHkXNVWw6D3GHScdmZTM/exec";
+
+  // Desenho do prédio: mesmo do Code.gs. Unidade = andar × 100 + coluna (ex.: 2º andar, coluna 3 = 203)
+  var BLOCOS = [
+    { id: "1", nome: "Bloco 1", andares: 7, colunas: 6 },
+    { id: "2", nome: "Bloco 2", andares: 7, colunas: 7 }
+  ];
+  var MAX_MORADORES = 15;
+
+  var elLista = document.getElementById("lista");
+  var elBusca = document.getElementById("busca");
+  var elContador = document.getElementById("contador");
+  var elBarra = document.getElementById("barra");
+  var elEstado = document.getElementById("estado");
+  var janela = document.getElementById("janela");
+
+  var contagem = {};      // { "1-101": 2 }
+  var filtroBloco = "";
+  var atual = null;       // { bloco, unidade, nomeBloco }
+  var telefoneVerif = ""; // telefone confirmado para alterar o apartamento aberto
+  var moradores = [];     // [{ nome, telefone, email }]
+
+  function digitos(t) { return String(t || "").replace(/\D/g, ""); }
+
+  function formatarFone(t) {
+    var d = digitos(t);
+    if (d.length === 13 && d.indexOf("55") === 0) d = d.slice(2);
+    if (d.length === 11) return "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7);
+    if (d.length === 10) return "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6);
+    return String(t || "").trim();
+  }
+
+  function chamar(dados) {
+    return fetch(API, { method: "POST", body: JSON.stringify(dados) }).then(function (r) { return r.json(); });
+  }
+
+  function todosAptos() {
+    var lista = [];
+    BLOCOS.forEach(function (b) {
+      for (var a = 1; a <= b.andares; a++) {
+        for (var c = 1; c <= b.colunas; c++) lista.push({ bloco: b.id, nomeBloco: b.nome, andar: a, unidade: String(a * 100 + c) });
+      }
+    });
+    return lista;
+  }
+  var APTOS = todosAptos();
+
+  // ---------- Lista ----------
+  function renderLista() {
+    var q = digitos(elBusca.value);
+    var html = "";
+    BLOCOS.forEach(function (b) {
+      if (filtroBloco && filtroBloco !== b.id) return;
+      for (var a = 1; a <= b.andares; a++) {
+        var doAndar = APTOS.filter(function (x) { return x.bloco === b.id && x.andar === a && (!q || x.unidade.indexOf(q) >= 0); });
+        if (!doAndar.length) continue;
+        html += '<div class="andar">' + b.nome + " · " + a + "º andar</div><div class=\"grade\">";
+        doAndar.forEach(function (x) {
+          var n = contagem[x.bloco + "-" + x.unidade] || 0;
+          var st = n ? "✓ " + n + (n === 1 ? " morador" : " moradores") : "Cadastrar";
+          html += '<button type="button" class="apto' + (n ? " feito" : "") + '" data-bloco="' + x.bloco + '" data-unidade="' + x.unidade + '">' +
+                  '<span class="num">' + x.unidade + '</span><span class="st">' + st + "</span></button>";
+        });
+        html += "</div>";
+      }
+    });
+    elLista.innerHTML = html || '<div class="vazio">Nenhum apartamento com esse número. Confira o número ou escolha “Todos”.</div>';
+
+    var feitos = APTOS.filter(function (x) { return contagem[x.bloco + "-" + x.unidade]; }).length;
+    elContador.textContent = feitos + " de " + APTOS.length + " apartamentos cadastrados";
+    elBarra.style.width = (feitos / APTOS.length * 100) + "%";
+  }
+
+  function carregarStatus() {
+    return fetch(API + "?api=status").then(function (r) { return r.json(); }).then(function (r) {
+      if (r.ok) { contagem = r.contagem || {}; elEstado.textContent = ""; }
+      renderLista();
+    }).catch(function () {
+      elEstado.textContent = "Não foi possível carregar os cadastros agora. Recarregue a página.";
+      renderLista();
+    });
+  }
+
+  elBusca.addEventListener("input", renderLista);
+  document.getElementById("filtros").addEventListener("click", function (e) {
+    var chip = e.target.closest(".chip");
+    if (!chip) return;
+    filtroBloco = chip.dataset.bloco;
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("ativo", c === chip); });
+    renderLista();
+  });
+  elLista.addEventListener("click", function (e) {
+    var b = e.target.closest(".apto");
+    if (b) abrirApto(b.dataset.bloco, b.dataset.unidade);
+  });
+
+  // ---------- Janela do apartamento ----------
+  function mostrar(id) {
+    ["j-verificar", "j-form", "j-ok"].forEach(function (x) { document.getElementById(x).hidden = x !== id; });
+  }
+
+  function abrirApto(bloco, unidade) {
+    var b = BLOCOS.filter(function (x) { return x.id === bloco; })[0];
+    atual = { bloco: bloco, unidade: unidade, nomeBloco: b.nome };
+    telefoneVerif = "";
+    document.getElementById("j-titulo").textContent = b.nome + " · Apartamento " + unidade;
+    var n = contagem[bloco + "-" + unidade] || 0;
+    if (n) {
+      document.getElementById("j-verificar-texto").textContent =
+        "Este apartamento já tem cadastro (" + n + (n === 1 ? " morador" : " moradores") + "). Para ver ou corrigir, digite o telefone de um dos moradores cadastrados.";
+      document.getElementById("j-tel-verif").value = "";
+      document.getElementById("j-verificar-aviso").textContent = "";
+      mostrar("j-verificar");
+    } else {
+      moradores = [{ nome: "", telefone: "", email: "" }];
+      renderMoradores();
+      document.getElementById("j-form-aviso").textContent = "";
+      mostrar("j-form");
+    }
+    janela.showModal();
+  }
+
+  document.getElementById("j-verificar-ok").addEventListener("click", function () {
+    var botao = this;
+    var tel = document.getElementById("j-tel-verif").value;
+    var aviso = document.getElementById("j-verificar-aviso");
+    if (digitos(tel).length < 8) { aviso.textContent = "Digite o telefone completo, com DDD."; return; }
+    botao.disabled = true; botao.textContent = "Conferindo…";
+    chamar({ acao: "abrir", bloco: atual.bloco, unidade: atual.unidade, telefone: tel }).then(function (r) {
+      if (!r.ok) { aviso.textContent = r.erro; return; }
+      telefoneVerif = tel;
+      moradores = r.moradores.length ? r.moradores : [{ nome: "", telefone: "", email: "" }];
+      renderMoradores();
+      document.getElementById("j-form-aviso").textContent = "";
+      mostrar("j-form");
+    }).catch(function () {
+      aviso.textContent = "Não foi possível conferir agora. Verifique a internet e tente de novo.";
+    }).then(function () { botao.disabled = false; botao.textContent = "Continuar"; });
+  });
+
+  function escapar(t) {
+    return String(t || "").replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+
+  function renderMoradores() {
+    var html = "";
+    moradores.forEach(function (m, i) {
+      html += '<div class="morador" data-i="' + i + '">' +
+        '<div class="morador-topo"><strong>Morador ' + (i + 1) + (i === 0 ? " (responsável)" : "") + "</strong>" +
+        (moradores.length > 1 ? '<button type="button" class="remover" data-remover="' + i + '">Remover</button>' : "") + "</div>" +
+        '<label class="campo"><span>Nome completo</span><input data-campo="nome" value="' + escapar(m.nome) + '" autocomplete="name" placeholder="Nome e sobrenome"></label>' +
+        '<label class="campo"><span>Telefone / WhatsApp ' + (i === 0 ? "" : "<em>(opcional)</em>") + '</span><input data-campo="telefone" type="tel" inputmode="tel" value="' + escapar(m.telefone) + '" placeholder="(21) 99999-9999"></label>' +
+        '<label class="campo"><span>E-mail <em>(opcional)</em></span><input data-campo="email" type="email" inputmode="email" value="' + escapar(m.email) + '" placeholder="nome@exemplo.com"></label>' +
+        "</div>";
+    });
+    document.getElementById("j-moradores").innerHTML = html;
+    document.getElementById("j-qtd").textContent = moradores.length;
+    document.getElementById("j-adicionar").hidden = moradores.length >= MAX_MORADORES;
+  }
+
+  var elMoradores = document.getElementById("j-moradores");
+  elMoradores.addEventListener("input", function (e) {
+    var campo = e.target.dataset.campo;
+    if (!campo) return;
+    var i = Number(e.target.closest(".morador").dataset.i);
+    moradores[i][campo] = e.target.value;
+    e.target.classList.remove("invalido");
+  });
+  elMoradores.addEventListener("focusout", function (e) {
+    if (e.target.dataset.campo !== "telefone") return;
+    var i = Number(e.target.closest(".morador").dataset.i);
+    e.target.value = moradores[i].telefone = formatarFone(e.target.value);
+  });
+  elMoradores.addEventListener("click", function (e) {
+    var r = e.target.dataset.remover;
+    if (r === undefined) return;
+    var m = moradores[Number(r)];
+    if ((m.nome || m.telefone || m.email) && !confirm("Remover " + (m.nome || "este morador") + " do cadastro?")) return;
+    moradores.splice(Number(r), 1);
+    renderMoradores();
+  });
+
+  function adicionar() {
+    if (moradores.length >= MAX_MORADORES) return;
+    moradores.push({ nome: "", telefone: "", email: "" });
+    renderMoradores();
+    var cards = elMoradores.querySelectorAll(".morador");
+    cards[cards.length - 1].querySelector("input").focus();
+  }
+  document.getElementById("j-mais").addEventListener("click", adicionar);
+  document.getElementById("j-adicionar").addEventListener("click", adicionar);
+  document.getElementById("j-menos").addEventListener("click", function () {
+    if (moradores.length <= 1) return;
+    var m = moradores[moradores.length - 1];
+    if ((m.nome || m.telefone || m.email) && !confirm("Remover " + (m.nome || "o último morador") + " do cadastro?")) return;
+    moradores.pop();
+    renderMoradores();
+  });
+
+  function validar() {
+    var erro = "";
+    var cards = elMoradores.querySelectorAll(".morador");
+    moradores.forEach(function (m, i) {
+      var c = cards[i];
+      function marca(campo, msg) { c.querySelector('[data-campo="' + campo + '"]').classList.add("invalido"); if (!erro) erro = msg; }
+      if (!m.nome.trim()) marca("nome", "Preencha o nome do morador " + (i + 1) + ".");
+      var d = digitos(m.telefone);
+      if (i === 0 && d.length < 10) marca("telefone", "Informe o telefone com DDD do morador 1 (responsável).");
+      else if (d && d.length < 10) marca("telefone", "O telefone do morador " + (i + 1) + " está incompleto (use o DDD).");
+      if (m.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.email.trim())) marca("email", "O e-mail do morador " + (i + 1) + " parece errado.");
+    });
+    return erro;
+  }
+
+  document.getElementById("j-salvar").addEventListener("click", function () {
+    var botao = this;
+    var aviso = document.getElementById("j-form-aviso");
+    var erro = validar();
+    if (erro) { aviso.textContent = erro; return; }
+    aviso.textContent = "";
+    botao.disabled = true; botao.textContent = "Salvando…";
+    chamar({ acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, telefone: telefoneVerif, moradores: moradores }).then(function (r) {
+      if (!r.ok) { aviso.textContent = r.erro; return; }
+      contagem = r.contagem || contagem;
+      telefoneVerif = moradores[0].telefone;
+      renderLista();
+      var n = moradores.length;
+      document.getElementById("j-ok-texto").innerHTML = "<strong>Cadastro salvo!</strong><br>" + atual.nomeBloco + " · Apartamento " + atual.unidade +
+        " · " + n + (n === 1 ? " morador" : " moradores") + ".";
+      mostrar("j-ok");
+    }).catch(function () {
+      aviso.textContent = "Não foi possível salvar agora. Verifique a internet e tente de novo.";
+    }).then(function () { botao.disabled = false; botao.textContent = "Salvar cadastro"; });
+  });
+
+  // Fechar a janela: botão ✕, botões "Cancelar"/"Fechar" e toque fora dela
+  document.getElementById("j-fechar").addEventListener("click", function () { janela.close(); });
+  janela.addEventListener("click", function (e) {
+    if (e.target.hasAttribute("data-fechar") || e.target === janela) janela.close();
+  });
+
+  renderLista();
+  carregarStatus();
+})();
+</script>
 </body>
 </html>
