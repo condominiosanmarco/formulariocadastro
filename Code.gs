@@ -69,7 +69,9 @@ function _linhas() {
   var aba = _aba();
   var n = aba.getLastRow();
   if (n < 2) return [];
-  return aba.getRange(2, 1, n - 1, CABECALHO.length).getDisplayValues();
+  // Ignora linhas vazias (sobra de quem apaga uma linha à mão): o próximo salvamento reorganiza a planilha
+  return aba.getRange(2, 1, n - 1, CABECALHO.length).getDisplayValues()
+    .filter(function (l) { return l[0] || l[1] || l[2]; });
 }
 
 function _existe(bloco, unidade) {
@@ -193,6 +195,7 @@ function _salvar(d) {
     var n = aba.getLastRow();
     aba.getRange(2, 1, final.length, CABECALHO.length).setValues(final);
     if (n > final.length + 1) aba.getRange(final.length + 2, 1, n - final.length - 1, CABECALHO.length).clearContent();
+    SpreadsheetApp.flush(); // grava de verdade antes de soltar a trava, para o próximo envio ler a planilha atualizada
     var cadastrados = {};
     final.forEach(function (l) { cadastrados[l[0] + '-' + l[1]] = true; });
     return { ok: true, cadastrados: cadastrados };
