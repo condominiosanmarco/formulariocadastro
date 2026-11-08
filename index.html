@@ -81,6 +81,8 @@
   .morador-topo { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
   .morador-topo strong { font-size:15px; }
   .remover { border:none; background:none; color:var(--err); font-size:13px; padding:4px 0; }
+  .apagar { display:block; width:100%; margin-top:14px; padding:11px; border-radius:10px; border:1px solid var(--err); background:var(--err-soft); color:var(--err); font-size:15px; font-weight:600; }
+  .apagar:disabled { opacity:.6; }
   .adicionar { width:100%; padding:11px; border-radius:10px; border:1px dashed var(--brand); background:none; color:var(--brand); font-size:15px; font-weight:600; margin-bottom:14px; }
   .aviso { min-height:0; font-size:14px; color:var(--err); margin-bottom:10px; }
   .acoes { display:flex; gap:10px; }
@@ -238,6 +240,8 @@
       <button type="button" class="secundario" data-fechar>Cancelar</button>
       <button type="button" class="primario" id="j-salvar">Salvar cadastro</button>
     </div>
+    <!-- Só a síndica vê: apaga o cadastro inteiro do apartamento (lixeira) -->
+    <button type="button" class="apagar" id="j-apagar" hidden>🗑 Apagar cadastro deste apartamento</button>
   </div>
 
   <!-- Confirmação -->
@@ -365,6 +369,7 @@
     var b = BLOCOS.filter(function (x) { return x.id === bloco; })[0];
     atual = { bloco: bloco, unidade: unidade, nomeBloco: b.nome };
     telefoneVerif = "";
+    document.getElementById("j-apagar").hidden = true;
     document.getElementById("j-titulo").textContent = b.nome + " · Apartamento " + unidade;
     if (cadastrados[bloco + "-" + unidade] && senhaSindica) {
       abrirComoSindica();
@@ -604,6 +609,7 @@
     var senha = document.getElementById("adm-senha").value.trim();
     if (!senha) { aviso.textContent = "Digite a senha."; return; }
     aviso.textContent = "";
+    aviso.style.color = ""; // volta ao vermelho de erro (a mensagem verde de "apagado" é só de sucesso)
     botao.disabled = true; botao.textContent = "Entrando…";
     chamar({ acao: "sindica", senha: senha }).then(function (r) {
       if (!r.ok) { aviso.textContent = r.erro; return; }
@@ -633,11 +639,34 @@
       moradores = r.moradores.length ? r.moradores : [{ nome: "", telefone: "", email: "" }];
       renderMoradores();
       document.getElementById("j-form-aviso").textContent = "";
+      document.getElementById("j-apagar").hidden = false;
       mostrar("j-form");
     }).catch(function () {
       document.getElementById("j-verificar-aviso").textContent = "Não foi possível abrir agora. Tente de novo.";
     });
   }
+
+  // Síndica apaga o cadastro inteiro de um apartamento (ex.: alguém cadastrou no apartamento errado)
+  document.getElementById("j-apagar").addEventListener("click", function () {
+    var botao = this;
+    var aviso = document.getElementById("j-form-aviso");
+    var rotulo = atual.nomeBloco + " · Apartamento " + atual.unidade;
+    if (!confirm("Apagar TODO o cadastro de " + rotulo + "?\n\nOs moradores deste apartamento saem da lista. Isso não tem como desfazer.")) return;
+    aviso.textContent = "";
+    botao.disabled = true; botao.textContent = "Apagando…";
+    chamar({ acao: "apagar", bloco: atual.bloco, unidade: atual.unidade, senha: senhaSindica }).then(function (r) {
+      if (!r.ok) { aviso.textContent = r.erro; return; }
+      delete cadastrados[atual.bloco + "-" + atual.unidade];
+      janela.close();
+      renderLista();
+      var avisoAdm = document.getElementById("adm-aviso");
+      avisoAdm.style.color = "var(--ok)";
+      avisoAdm.textContent = "Cadastro do " + rotulo + " apagado. O apartamento volta a ficar disponível para cadastro.";
+      carregarSindica();
+    }).catch(function () {
+      aviso.textContent = "Não foi possível apagar agora. Verifique a internet e tente de novo.";
+    }).then(function () { botao.disabled = false; botao.textContent = "🗑 Apagar cadastro deste apartamento"; });
+  });
 
   function dataHoje(comHora) {
     var d = new Date();

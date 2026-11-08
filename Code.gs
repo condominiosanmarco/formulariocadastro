@@ -9,7 +9,7 @@
  * Quem vê o quê:
  *   - Morador: a lista pública mostra só se o apartamento está cadastrado. Para ver ou corrigir o próprio
  *     apartamento, confirma o telefone de um morador já cadastrado nele.
- *   - Síndica: entra com a senha e vê/corrige todos os apartamentos e baixa a lista (PDF, Excel, CSV).
+ *   - Síndica: entra com a senha e vê/corrige/apaga o cadastro de qualquer apartamento e baixa a lista (PDF, Excel, CSV).
  *     A senha NÃO fica neste arquivo: em Configurações do projeto > Propriedades do script, a propriedade
  *     SENHA_SINDICA_SHA256 guarda o SHA-256 (hex, minúsculo) da senha.
  *
@@ -34,7 +34,7 @@ function doGet(e) {
   return ContentService.createTextOutput('Cadastro de moradores · Condomínio San Marco');
 }
 
-/** Recebe { acao: "abrir" | "salvar" | "sindica", bloco, unidade, telefone, senha, moradores } da página. */
+/** Recebe { acao: "abrir" | "salvar" | "sindica" | "apagar", bloco, unidade, telefone, senha, moradores } da página. */
 function doPost(e) {
   var d;
   try {
@@ -45,6 +45,7 @@ function doPost(e) {
   if (d.acao === 'abrir') return _json(_abrir(d));
   if (d.acao === 'salvar') return _json(_salvar(d));
   if (d.acao === 'sindica') return _json(_sindica(d));
+  if (d.acao === 'apagar') return _json(_apagar(d));
   return _json({ ok: false, erro: 'Ação desconhecida.' });
 }
 
@@ -198,6 +199,31 @@ function _salvar(d) {
     SpreadsheetApp.flush(); // grava de verdade antes de soltar a trava, para o próximo envio ler a planilha atualizada
     var cadastrados = {};
     final.forEach(function (l) { cadastrados[l[0] + '-' + l[1]] = true; });
+    return { ok: true, cadastrados: cadastrados };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Síndica: apaga o cadastro inteiro de um apartamento (ex.: alguém cadastrou no apartamento errado). */
+function _apagar(d) {
+  if (!_ehSindica(d.senha)) return { ok: false, erro: 'Senha incorreta.' };
+  var bloco = String(d.bloco || '');
+  var unidade = String(d.unidade || '');
+  if (!_existe(bloco, unidade)) return { ok: false, erro: 'Apartamento não encontrado.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var restantes = _linhas().filter(function (l) { return !(l[0] === bloco && l[1] === unidade); });
+    var aba = _aba();
+    var n = aba.getLastRow();
+    // Reescreve a lista sem o apartamento e limpa o que sobrou no fim (mesmo jeito do _salvar)
+    if (restantes.length) aba.getRange(2, 1, restantes.length, CABECALHO.length).setValues(restantes);
+    if (n > restantes.length + 1) aba.getRange(restantes.length + 2, 1, n - restantes.length - 1, CABECALHO.length).clearContent();
+    SpreadsheetApp.flush();
+    var cadastrados = {};
+    restantes.forEach(function (l) { cadastrados[l[0] + '-' + l[1]] = true; });
     return { ok: true, cadastrados: cadastrados };
   } finally {
     lock.releaseLock();
