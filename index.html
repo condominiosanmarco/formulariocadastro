@@ -138,7 +138,7 @@
     <div class="topo-texto">
       <p class="sobre">Condomínio San Marco</p>
       <h1>Cadastro de moradores</h1>
-      <p class="sub">Atualize os dados de quem mora no seu apartamento. Leva só alguns minutos.</p>
+      <p class="sub">Cadastre quem mora no seu apartamento. Leva só alguns minutos.</p>
     </div>
   </header>
 
@@ -147,9 +147,9 @@
     <ol class="passos">
       <li><strong>Encontre seu apartamento.</strong> Digite o número na busca (ex.: 203) ou role a lista e escolha o bloco.</li>
       <li><strong>Toque no apartamento.</strong> Informe quantas pessoas moram nele e preencha, para cada uma, o nome completo, o telefone/WhatsApp e o e-mail (o e-mail é opcional).</li>
-      <li><strong>Toque em “Salvar cadastro”.</strong> Pronto: o apartamento fica verde clarinho, escrito “Cadastrado”.</li>
+      <li><strong>Confira os dados e toque em “Salvar cadastro”.</strong> Pronto: o apartamento fica verde clarinho, escrito “Cadastrado”. Depois de salvo, só a síndica pode corrigir.</li>
     </ol>
-    <p class="dica"><strong>Precisa corrigir?</strong> Peça à síndica. Só ela pode ver ou corrigir os dados de um apartamento já cadastrado, como nome, telefone, e-mail ou moradores. Por segurança, essas informações não ficam disponíveis para os outros moradores.</p>
+    <p class="dica"><strong>Precisa corrigir?</strong> Peça à síndica, em horário comercial. Só ela pode ver ou corrigir os dados de um apartamento já cadastrado, como nome, telefone, e-mail ou moradores. Por segurança, essas informações não ficam disponíveis para os outros moradores.</p>
   </section>
 
   <section class="bloco-card">
@@ -172,7 +172,7 @@
   <section class="bloco-card admin" id="area-sindica">
     <h2>Área da síndica</h2>
     <div id="adm-login">
-      <p>Somente a síndica tem acesso aos dados de todos os apartamentos. Digite a senha para ver a lista completa, corrigir qualquer apartamento e baixar a lista em PDF, Excel ou CSV.</p>
+      <p>Somente a síndica tem acesso aos dados de todos os apartamentos. Digite a senha para ver a lista completa, corrigir ou apagar o cadastro de qualquer apartamento e baixar a lista em PDF, Excel ou CSV.</p>
       <div class="admin-entrar">
         <input id="adm-senha" type="password" autocomplete="current-password" placeholder="Senha da síndica" aria-label="Senha da síndica">
         <button type="button" class="primario" id="adm-entrar">Entrar</button>
@@ -181,7 +181,7 @@
     <div class="aviso" id="adm-aviso"></div>
     <div id="adm-painel" hidden>
       <p class="resumo-adm" id="adm-resumo"></p>
-      <p>Para corrigir um apartamento, toque nele na lista acima: como síndica, você não precisa confirmar telefone.</p>
+      <p>Para ver, corrigir ou apagar um apartamento, toque nele na lista acima.</p>
       <div class="adm-botoes">
         <button type="button" id="adm-pdf">📄 PDF</button>
         <button type="button" id="adm-xlsx">📊 Excel</button>
@@ -242,7 +242,7 @@
     <div class="check">✓</div>
     <p id="j-ok-texto"></p>
     <p class="confirmacao" id="j-ok-confirmacao"></p>
-    <p style="color:var(--muted);font-size:14px">Para corrigir depois, é só tocar no apartamento de novo.</p>
+    <p style="color:var(--muted);font-size:14px" id="j-ok-corrigir"></p>
     <div class="acoes"><button type="button" class="primario" data-fechar>Fechar</button></div>
   </div>
 </dialog>
@@ -271,7 +271,6 @@
   var senhaSindica = "";  // preenchida quando a síndica entra (fica só na memória da página)
   var filtroBloco = "";
   var atual = null;       // { bloco, unidade, nomeBloco }
-  var telefoneVerif = ""; // telefone confirmado para alterar o apartamento aberto
   var moradores = [];     // [{ nome, telefone, email }]
 
   function digitos(t) { return String(t || "").replace(/\D/g, ""); }
@@ -361,14 +360,13 @@
   function abrirApto(bloco, unidade) {
     var b = BLOCOS.filter(function (x) { return x.id === bloco; })[0];
     atual = { bloco: bloco, unidade: unidade, nomeBloco: b.nome };
-    telefoneVerif = "";
     document.getElementById("j-apagar").hidden = true;
     document.getElementById("j-titulo").textContent = b.nome + " · Apartamento " + unidade;
     if (cadastrados[bloco + "-" + unidade] && senhaSindica) {
       abrirComoSindica();
     } else if (cadastrados[bloco + "-" + unidade]) {
       document.getElementById("j-bloqueado-texto").textContent =
-        "Este apartamento já está cadastrado. Para ver ou corrigir, fale com a síndica.";
+        "Este apartamento já está cadastrado. Para ver ou corrigir, fale com a síndica, em horário comercial.";
       document.getElementById("j-bloqueado-aviso").textContent = "";
       mostrar("j-bloqueado");
     } else {
@@ -379,7 +377,6 @@
     }
     janela.showModal();
   }
-
 
   function escapar(t) {
     return String(t || "").replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
@@ -527,16 +524,17 @@
     aviso.textContent = "";
 
     var chave = atual.bloco + "-" + atual.unidade;
-    var pedido = { acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, telefone: telefoneVerif, senha: senhaSindica, moradores: moradores.slice() };
+    var pedido = { acao: "salvar", bloco: atual.bloco, unidade: atual.unidade, senha: senhaSindica, moradores: moradores.slice() };
     if (!senhaSindica) { pendentes[chave] = pedido; gravarPendentes(); } // a senha da síndica nunca fica guardada no celular
 
     // Verde na hora
     cadastrados[chave] = true;
-    telefoneVerif = moradores[0].telefone;
     renderLista();
     var n = moradores.length;
     document.getElementById("j-ok-texto").innerHTML = "<strong>Cadastro salvo!</strong><br>" + atual.nomeBloco + " · Apartamento " + atual.unidade +
       " · " + n + (n === 1 ? " morador" : " moradores") + ".";
+    document.getElementById("j-ok-corrigir").textContent = senhaSindica ?
+      "Para corrigir depois, é só tocar no apartamento de novo." : "Se precisar corrigir depois, fale com a síndica, em horário comercial.";
     var elConf = document.getElementById("j-ok-confirmacao");
     elConf.textContent = "Enviando para o condomínio…";
     mostrar("j-ok");
@@ -603,7 +601,7 @@
     document.getElementById("adm-login").hidden = false;
   });
 
-  // Síndica abre um apartamento já cadastrado direto, sem confirmar telefone
+  // Síndica abre um apartamento já cadastrado (só com a senha)
   function abrirComoSindica() {
     document.getElementById("j-bloqueado-texto").textContent = "Carregando os moradores…";
     document.getElementById("j-bloqueado-aviso").textContent = "";
