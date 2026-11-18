@@ -149,7 +149,7 @@
       <li><strong>Toque no apartamento.</strong> Informe quantas pessoas moram nele e preencha, para cada uma, o nome completo, o telefone/WhatsApp e o e-mail (o e-mail é opcional).</li>
       <li><strong>Toque em “Salvar cadastro”.</strong> Pronto: o apartamento fica verde clarinho, escrito “Cadastrado”.</li>
     </ol>
-    <p class="dica"><strong>Precisa corrigir?</strong> Para trocar um nome, mudar um telefone, incluir ou tirar um morador, toque de novo no seu apartamento e confirme o telefone de um dos moradores já cadastrados. Por segurança, os dados de um apartamento não aparecem para os outros moradores.</p>
+    <p class="dica"><strong>Precisa corrigir?</strong> Peça à síndica. Só ela pode ver ou corrigir os dados de um apartamento já cadastrado, como nome, telefone, e-mail ou moradores. Por segurança, essas informações não ficam disponíveis para os outros moradores.</p>
   </section>
 
   <section class="bloco-card">
@@ -166,7 +166,7 @@
     <div class="legenda"><span><i class="ponto"></i>Falta cadastrar</span><span><i class="ponto feito"></i>Cadastrado</span></div>
     <div class="estado" id="estado"></div>
     <div class="lista" id="lista" tabindex="0" aria-label="Lista de apartamentos"></div>
-    <p class="nao-achou">Não encontrou seu apartamento ou esqueceu o telefone cadastrado? Fale com a síndica.</p>
+    <p class="nao-achou">Não encontrou seu apartamento? Fale com a síndica.</p>
   </section>
 
   <section class="bloco-card admin" id="area-sindica">
@@ -209,18 +209,11 @@
     <button type="button" class="fechar" id="j-fechar" aria-label="Fechar">✕</button>
   </div>
 
-  <!-- Apartamento já cadastrado: confirma o telefone antes de mostrar os dados -->
-  <div class="j-corpo" id="j-verificar" hidden>
-    <p id="j-verificar-texto"></p>
-    <label class="campo">
-      <span>Telefone de um morador cadastrado</span>
-      <input id="j-tel-verif" type="tel" inputmode="tel" autocomplete="tel" placeholder="(21) 99999-9999">
-    </label>
-    <div class="aviso" id="j-verificar-aviso"></div>
-    <div class="acoes">
-      <button type="button" class="secundario" data-fechar>Cancelar</button>
-      <button type="button" class="primario" id="j-verificar-ok">Continuar</button>
-    </div>
+  <!-- Apartamento já cadastrado (morador) ou carregando (síndica): só a síndica corrige -->
+  <div class="j-corpo" id="j-bloqueado" hidden>
+    <p id="j-bloqueado-texto"></p>
+    <div class="aviso" id="j-bloqueado-aviso"></div>
+    <div class="acoes"><button type="button" class="primario" data-fechar>Fechar</button></div>
   </div>
 
   <!-- Formulário dos moradores -->
@@ -362,7 +355,7 @@
 
   // ---------- Janela do apartamento ----------
   function mostrar(id) {
-    ["j-verificar", "j-form", "j-ok"].forEach(function (x) { document.getElementById(x).hidden = x !== id; });
+    ["j-bloqueado", "j-form", "j-ok"].forEach(function (x) { document.getElementById(x).hidden = x !== id; });
   }
 
   function abrirApto(bloco, unidade) {
@@ -374,11 +367,10 @@
     if (cadastrados[bloco + "-" + unidade] && senhaSindica) {
       abrirComoSindica();
     } else if (cadastrados[bloco + "-" + unidade]) {
-      document.getElementById("j-verificar-texto").textContent =
-        "Este apartamento já foi cadastrado. Para ver ou corrigir, digite o telefone de um dos moradores cadastrados.";
-      document.getElementById("j-tel-verif").value = "";
-      document.getElementById("j-verificar-aviso").textContent = "";
-      mostrar("j-verificar");
+      document.getElementById("j-bloqueado-texto").textContent =
+        "Este apartamento já está cadastrado. Para ver ou corrigir, fale com a síndica.";
+      document.getElementById("j-bloqueado-aviso").textContent = "";
+      mostrar("j-bloqueado");
     } else {
       moradores = [{ nome: "", telefone: "", email: "" }];
       renderMoradores();
@@ -388,23 +380,6 @@
     janela.showModal();
   }
 
-  document.getElementById("j-verificar-ok").addEventListener("click", function () {
-    var botao = this;
-    var tel = document.getElementById("j-tel-verif").value;
-    var aviso = document.getElementById("j-verificar-aviso");
-    if (digitos(tel).length < 8) { aviso.textContent = "Digite o telefone completo, com DDD."; return; }
-    botao.disabled = true; botao.textContent = "Conferindo…";
-    chamar({ acao: "abrir", bloco: atual.bloco, unidade: atual.unidade, telefone: tel }).then(function (r) {
-      if (!r.ok) { aviso.textContent = r.erro; return; }
-      telefoneVerif = tel;
-      moradores = r.moradores.length ? r.moradores : [{ nome: "", telefone: "", email: "" }];
-      renderMoradores();
-      document.getElementById("j-form-aviso").textContent = "";
-      mostrar("j-form");
-    }).catch(function () {
-      aviso.textContent = "Não foi possível conferir agora. Verifique a internet e tente de novo.";
-    }).then(function () { botao.disabled = false; botao.textContent = "Continuar"; });
-  });
 
   function escapar(t) {
     return String(t || "").replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
@@ -630,19 +605,18 @@
 
   // Síndica abre um apartamento já cadastrado direto, sem confirmar telefone
   function abrirComoSindica() {
-    document.getElementById("j-verificar-texto").textContent = "Carregando os moradores…";
-    document.getElementById("j-tel-verif").value = "";
-    document.getElementById("j-verificar-aviso").textContent = "";
-    mostrar("j-verificar");
+    document.getElementById("j-bloqueado-texto").textContent = "Carregando os moradores…";
+    document.getElementById("j-bloqueado-aviso").textContent = "";
+    mostrar("j-bloqueado");
     chamar({ acao: "abrir", bloco: atual.bloco, unidade: atual.unidade, senha: senhaSindica }).then(function (r) {
-      if (!r.ok) { document.getElementById("j-verificar-aviso").textContent = r.erro; return; }
+      if (!r.ok) { document.getElementById("j-bloqueado-aviso").textContent = r.erro; return; }
       moradores = r.moradores.length ? r.moradores : [{ nome: "", telefone: "", email: "" }];
       renderMoradores();
       document.getElementById("j-form-aviso").textContent = "";
       document.getElementById("j-apagar").hidden = false;
       mostrar("j-form");
     }).catch(function () {
-      document.getElementById("j-verificar-aviso").textContent = "Não foi possível abrir agora. Tente de novo.";
+      document.getElementById("j-bloqueado-aviso").textContent = "Não foi possível abrir agora. Tente de novo.";
     });
   }
 

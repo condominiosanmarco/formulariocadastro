@@ -7,8 +7,8 @@
  * sempre em ordem de bloco e apartamento (101, 102, ... 201, 202 ...).
  *
  * Quem vê o quê:
- *   - Morador: a lista pública mostra só se o apartamento está cadastrado. Para ver ou corrigir o próprio
- *     apartamento, confirma o telefone de um morador já cadastrado nele.
+ *   - Morador: a lista pública mostra só se o apartamento está cadastrado. Pode cadastrar apartamento livre;
+ *     para ver ou corrigir um apartamento já cadastrado, fala com a síndica.
  *   - Síndica: entra com a senha e vê/corrige/apaga o cadastro de qualquer apartamento e baixa a lista (PDF, Excel, CSV).
  *     A senha NÃO fica neste arquivo: em Configurações do projeto > Propriedades do script, a propriedade
  *     SENHA_SINDICA_SHA256 guarda o SHA-256 (hex, minúsculo) da senha.
@@ -114,17 +114,6 @@ function _ehSindica(senha) {
   return false;
 }
 
-/** O telefone informado bate (últimos 8 dígitos) com o de algum morador já cadastrado no apartamento? */
-function _confere(linhasDoApto, telefone) {
-  var t = _digitos(telefone);
-  if (t.length < 8) return false;
-  var fim = t.slice(-8);
-  return linhasDoApto.some(function (l) {
-    var d = _digitos(l[3]);
-    return d.length >= 8 && d.slice(-8) === fim;
-  });
-}
-
 function _limpar(texto, max) {
   return String(texto || '').replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 }
@@ -149,8 +138,8 @@ function _abrir(d) {
   if (!_existe(bloco, unidade)) return { ok: false, erro: 'Apartamento não encontrado.' };
   var doApto = _linhas().filter(function (l) { return l[0] === bloco && l[1] === unidade; });
   if (!doApto.length) return { ok: true, moradores: [] };
-  if (!_confere(doApto, d.telefone) && !_ehSindica(d.senha)) {
-    return { ok: false, erro: 'Esse telefone não confere com nenhum morador cadastrado neste apartamento.' };
+  if (!_ehSindica(d.senha)) {
+    return { ok: false, erro: 'Este apartamento já está cadastrado. Para ver ou corrigir, fale com a síndica.' };
   }
   return {
     ok: true,
@@ -181,8 +170,8 @@ function _salvar(d) {
   try {
     var todas = _linhas();
     var doApto = todas.filter(function (l) { return l[0] === bloco && l[1] === unidade; });
-    if (doApto.length && !sindica && !_confere(doApto, d.telefone)) {
-      return { ok: false, erro: 'Para alterar este apartamento, confirme o telefone de um morador já cadastrado.' };
+    if (doApto.length && !sindica) {
+      return { ok: false, erro: 'Este apartamento já está cadastrado. Para corrigir, fale com a síndica.' };
     }
     var agora = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm');
     var novas = moradores.map(function (m) { return [bloco, unidade, m.nome, m.telefone, m.email, agora]; });
